@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const shopifyCreationService_1 = require("../services/shopifyService/shopifyCreationService");
+const buyerService_1 = require("../services/shopifyService/buyerService");
+const router = require('express').Router();
+const shopify = new shopifyCreationService_1.ShopifyCreationService();
+const buyer = new buyerService_1.BuyerService();
+router.post('/addShopify', shopify.addNewShopify.bind(shopify));
+router.get('/getShopify', shopify.getAddedShopify.bind(shopify));
+router.post('/addVertical', shopify.addVertical.bind(shopify));
+router.get('/getVerticals', buyer.getVerticals.bind(buyer));
+router.post('/generateLink', buyer.generateLink.bind(buyer));
+router.get('/getHistory', buyer.getHistory.bind(buyer));
+module.exports = router;
