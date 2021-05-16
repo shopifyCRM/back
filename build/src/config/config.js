@@ -8,7 +8,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const database_1 = require("../../utils/database");
 dotenv_1.default.config();
 const SERVER_HOSTNAME = process.env.SERVER_HOSTNAME || 'localhost';
-const SERVER_PORT = process.env.SERVER_PORT || 80;
+const SERVER_PORT = process.env.SERVER_PORT || 5000;
 const SERVER = {
     hostname: SERVER_HOSTNAME,
     port: SERVER_PORT

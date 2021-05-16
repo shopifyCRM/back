@@ -65,13 +65,18 @@ class QiwiService {
     blockCard(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { card } = req.body;
-                const body = config_1.apiReqBody(`/cards/v2/persons/${config_1.QIWI_NUMBER}/cards/${card[0].id}/block`);
-                if (!card) {
+                const { cards } = req.body;
+                for (let i = 0; i < cards.length; i++) {
+                    const body = config_1.apiReqBody(`/cards/v2/persons/${config_1.QIWI_NUMBER}/cards/${cards[i].id}/block`);
+                    yield axios_1.default.put(body.url, {}, body.config);
+                }
+                if (!cards) {
                     return res.status(400).json({ msg: 'Выберите карту.' });
                 }
-                yield axios_1.default.put(body.url, {}, body.config);
-                return res.send(`Карта ${card.cardnumber} была успешно заблокирована.`);
+                if (cards.length === 1) {
+                    return res.send(`Карта ${cards[0].cardnumber} была успешно заблокирована.`);
+                }
+                return res.send('Выбранные карты были успешно заблокированы.');
             }
             catch (err) {
                 console.log(err);
