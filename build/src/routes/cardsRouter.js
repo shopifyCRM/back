@@ -2,14 +2,19 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const qiwiService_1 = require("../services/cardsServices/qiwiService");
 const balanceService_1 = require("../services/cardsServices/balanceService");
+const cardBlockService_1 = require("../services/cardsServices/cardBlockService");
+const renderAllCards_1 = require("../services/cardsServices/renderAllCards");
 const router = require('express').Router();
 const qiwiRoutes = new qiwiService_1.QiwiService();
 const qiwiBalance = new balanceService_1.BalanceService();
+const cardBlock = new cardBlockService_1.CardBlockService();
+const renderCards = new renderAllCards_1.RenderAllCards();
 //Qiwi api controllers
 router.post('/getCardsData', qiwiRoutes.getCardsDataForTable.bind(qiwiRoutes));
 router.post('/newCard', qiwiRoutes.newCard.bind(qiwiRoutes));
 router.put('/addOwnerToCards', qiwiRoutes.addOwnerToCards.bind(qiwiRoutes));
 router.get('/getBalance', qiwiBalance.getBalance.bind(qiwiBalance));
 router.post('/getTransactions', qiwiRoutes.getTransactionHistory.bind(qiwiRoutes));
-router.put('/blockCard', qiwiRoutes.blockCard.bind(qiwiRoutes));
+router.put('/blockCard', cardBlock.blockCard.bind(cardBlock));
+router.post('/renderCardsData', renderCards.renderAndReturnAllCards.bind(qiwiRoutes));
 module.exports = router;

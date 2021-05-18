@@ -31,13 +31,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QiwiService = void 0;
+exports.QiwiServiceHelper = exports.QiwiService = void 0;
 const config_1 = __importStar(require("../../config/config"));
 const axios_1 = __importDefault(require("axios"));
 const database_1 = require("../../../utils/database");
-const uuid_1 = require("uuid");
 const newCardService_1 = require("./newCardService");
 const cardOwnerService_1 = require("./cardOwnerService");
+const renderAllCards_1 = require("./renderAllCards");
 class QiwiService {
     constructor() {
         this.helper = new QiwiServiceHelper();
@@ -48,6 +48,7 @@ class QiwiService {
         this.getDate = this.helper.getDate;
         this.countCardTransactionsSum = this.helper.countCardTransactionSum;
         this.ownerCards = this.helper.getOwnerCards;
+        this.removeCardFromOwner = this.helper.removeCardFromUser;
     }
     newCard(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -62,34 +63,9 @@ class QiwiService {
             }
         });
     }
-    blockCard(req, res) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const { cards } = req.body;
-                for (let i = 0; i < cards.length; i++) {
-                    const body = config_1.apiReqBody(`/cards/v2/persons/${config_1.QIWI_NUMBER}/cards/${cards[i].id}/block`);
-                    yield axios_1.default.put(body.url, {}, body.config);
-                }
-                if (!cards) {
-                    return res.status(400).json({ msg: 'Выберите карту.' });
-                }
-                if (cards.length === 1) {
-                    return res.send(`Карта ${cards[0].cardnumber} была успешно заблокирована.`);
-                }
-                return res.send('Выбранные карты были успешно заблокированы.');
-            }
-            catch (err) {
-                console.log(err);
-                return res.status(400).json({ msg: err.response.data.msg });
-            }
-        });
-    }
     getCardsDataForTable(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const dbManager = new database_1.DatabaseManager(config_1.default.db);
-                let allCards = yield this.getCards.bind(this.helper)();
-                const cardIds = yield this.getIdsFromCards(allCards);
                 let { user } = req.body;
                 user = user.data;
                 if (user.access !== 'Owner') {
@@ -100,67 +76,12 @@ class QiwiService {
                     const ownerCards = yield this.ownerCards.bind(this.helper)(user, cardsToRes);
                     return res.send(ownerCards);
                 }
-                const cardsFromDbRes = yield dbManager.selectData('public.cards', '*');
-                const date = this.getDate(1);
-                const dailyTransactions = yield this.getTransactions(date);
-                const cardsToRes = [];
-                for (let i = 0, max = allCards.length; i < max; i++) {
-                    const body = config_1.apiReqBody(`/cards/v1/cards/${cardIds[i]}/details`);
-                    const uuid = uuid_1.v4();
-                    body.data = {
-                        operationId: uuid
-                    };
-                    if (cardsFromDbRes.find((card) => card.id === allCards[i].qvx.id) === undefined) {
-                        if (allCards[i].qvx.status === 'ACTIVE') {
-                            const qiwiApiRes = yield axios_1.default.put(body.url, body.data, body.config);
-                            if (qiwiApiRes.data.status === 'OK') {
-                                allCards.forEach((el) => {
-                                    const qvx = el.qvx;
-                                    const expiresAt = this.getExpiresAt(qvx);
-                                    if (qvx.id === cardIds[i]) {
-                                        dbManager.insertData('public.cards', 'id, cvv, cardnumber, expiresat', '$1, $2, $3, $4', [qvx.id, qiwiApiRes.data.cvv, qiwiApiRes.data.pan, expiresAt]);
-                                        const cardData = {
-                                            id: qvx.id,
-                                            cvv: qiwiApiRes.data.cvv,
-                                            cardnumber: qiwiApiRes.data.pan,
-                                            ownerlogin: null,
-                                            ownername: null,
-                                            expiresAt
-                                        };
-                                        const transactions = this.countCardTransactionsSum(qiwiApiRes.data.pan, dailyTransactions);
-                                        if (transactions.cardnumber === qiwiApiRes.data.pan) {
-                                            cardData.sum = transactions.sum;
-                                        }
-                                        cardsToRes.push(cardData);
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    else {
-                        const card = allCards.find((el) => el.qvx.id === cardsFromDbRes[i].id);
-                        if (card.qvx.status === 'ACTIVE') {
-                            let cardData = cardsFromDbRes[i];
-                            const transactions = this.countCardTransactionsSum(cardData.cardnumber, dailyTransactions);
-                            if (transactions.cardnumber === cardData.cardnumber) {
-                                cardData.sum = transactions.sum;
-                            }
-                            cardsToRes.push(cardData);
-                        }
-                        else {
-                            if (cardsFromDbRes[i].ownerlogin) {
-                                let existingUserRes = yield dbManager.findElement('*', 'public.staff', 'login', cardsFromDbRes[i].ownerlogin);
-                                const user = existingUserRes[0];
-                                user.cards = user.cards.filter((cardnumber) => cardnumber !== cardsFromDbRes[i].cardnumber);
-                                yield dbManager.updateElement('public.staff', user, 'id', user.id);
-                            }
-                            yield dbManager.deleteElement('*', 'public.cards', 'id', cardsFromDbRes[i].id);
-                        }
-                    }
-                }
+                const renderAllCardsHelper = new renderAllCards_1.RenderAllCards();
+                const cardsToRes = yield renderAllCardsHelper.renderAllCards.apply(this);
                 res.send(cardsToRes);
             }
             catch (err) {
+                console.log(err);
                 return res.status(400).json({ msg: 'Произошла ошибка при попытке получения карт.' });
             }
         });
@@ -182,7 +103,7 @@ class QiwiService {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { card } = req.body;
-                const date = this.getDate(89);
+                const date = this.getDate(90, 'manyDays');
                 const transactions = yield this.getTransactions(date);
                 const cardTransactions = transactions.data.filter((el) => el.account.slice(-4) === card[0].cardnumber.slice(-4));
                 const resTransactions = {};
@@ -236,10 +157,15 @@ class QiwiServiceHelper {
         const expiresAt = expiresAtMonth + '/' + expiresAtYear;
         return expiresAt;
     }
-    getDate(days) {
+    getDate(days, type) {
         const today = new Date();
         let getYesterday = new Date(today);
-        getYesterday = getYesterday.setDate(getYesterday.getDate() - days);
+        if (type === 'manyDays') {
+            getYesterday = getYesterday.setDate(getYesterday.getDate() - days);
+        }
+        else if (type === 'yesterday') {
+            getYesterday = getYesterday.setHours(0, 0, 0, 0);
+        }
         const from = encodeURIComponent(new Date(getYesterday).toISOString().slice(0, -5) + '+03:00');
         const till = encodeURIComponent(today.toISOString().slice(0, -5) + '+03:00');
         return { from, till };
@@ -267,7 +193,7 @@ class QiwiServiceHelper {
         let cardTransactionsSum = 0;
         const cardTransactions = cardsTransactions.data.filter((el) => el.account.slice(-4) === cardnumber.slice(-4));
         cardTransactions.map((el) => {
-            if (el.type === 'OUT') {
+            if (el.status !== 'ERROR') {
                 cardTransactionsSum += el.total.amount;
             }
         });
@@ -278,19 +204,47 @@ class QiwiServiceHelper {
     }
     getOwnerCards(user, cardsToRes) {
         return __awaiter(this, void 0, void 0, function* () {
-            const dbManager = new database_1.DatabaseManager(config_1.default.db);
-            const date = this.getDate(1);
-            const dailyTransactions = yield this.getTodayTransactions(date);
-            for (let i = 0, max = user.cards.length; i < max; i++) {
-                const rows = yield dbManager.findElement('*', 'public.cards', 'id', user.cards[i]);
-                const cardData = rows[0];
-                const transactions = this.countCardTransactionSum(cardData.cardnumber, dailyTransactions);
-                if (transactions.cardnumber === cardData.cardnumber) {
-                    cardData.sum = transactions.sum;
+            try {
+                const dbManager = new database_1.DatabaseManager(config_1.default.db);
+                const date = this.getDate(1, 'yesterday');
+                const dailyTransactions = yield this.getTodayTransactions(date);
+                for (let i = 0, max = user.cards.length; i < max; i++) {
+                    const rows = yield dbManager.findElement('*', 'public.cards', 'id', user.cards[i]);
+                    const cardData = rows[0];
+                    if (!cardData) {
+                        yield this.removeCardFromUser(user, user.cards[i]);
+                    }
+                    else {
+                        if (cardData.ownerlogin === user.login) {
+                            const transactions = this.countCardTransactionSum(cardData.cardnumber, dailyTransactions);
+                            if (transactions.cardnumber === cardData.cardnumber) {
+                                cardData.sum = transactions.sum;
+                            }
+                            cardsToRes.push(cardData);
+                        }
+                        else {
+                            yield this.removeCardFromUser(user, cardData.id);
+                        }
+                    }
                 }
-                cardsToRes.push(cardData);
+                return cardsToRes;
             }
-            return cardsToRes;
+            catch (err) {
+                console.log(err);
+            }
+        });
+    }
+    removeCardFromUser(user, card) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const dbManager = new database_1.DatabaseManager(config_1.default.db);
+                user.cards = user.cards.filter((el) => el !== card);
+                yield dbManager.updateElement('public.staff', user, 'login', user.login);
+            }
+            catch (err) {
+                console.log(err);
+            }
         });
     }
 }
+exports.QiwiServiceHelper = QiwiServiceHelper;
