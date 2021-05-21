@@ -38,6 +38,7 @@ const database_1 = require("../../../utils/database");
 const newCardService_1 = require("./newCardService");
 const cardOwnerService_1 = require("./cardOwnerService");
 const renderAllCards_1 = require("./renderAllCards");
+const moment_1 = __importDefault(require("moment"));
 class QiwiService {
     constructor() {
         this.helper = new QiwiServiceHelper();
@@ -67,13 +68,12 @@ class QiwiService {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 let { user } = req.body;
-                user = user.data;
                 if (user.access !== 'Owner') {
                     if (!user.cards.length) {
                         return res.status(400).json({ msg: 'У вас нету карт.' });
                     }
                     const cardsToRes = [];
-                    const ownerCards = yield this.ownerCards.bind(this.helper)(user, cardsToRes);
+                    const ownerCards = yield this.ownerCards.call(this.helper, user, cardsToRes);
                     return res.send(ownerCards);
                 }
                 const renderAllCardsHelper = new renderAllCards_1.RenderAllCards();
@@ -120,6 +120,7 @@ class QiwiService {
                 res.send({ transactions: resTransactions, transactionsSum });
             }
             catch (err) {
+                console.log(err);
                 res.status(400).json({ msg: err.response.data.msg });
             }
         });
@@ -162,12 +163,16 @@ class QiwiServiceHelper {
         let getYesterday = new Date(today);
         if (type === 'manyDays') {
             getYesterday = getYesterday.setDate(getYesterday.getDate() - days);
+            getYesterday = new Date(getYesterday);
         }
         else if (type === 'yesterday') {
-            getYesterday = getYesterday.setHours(0, 0, 0, 0);
+            getYesterday = moment_1.default().utcOffset(0);
+            getYesterday.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+            getYesterday.toISOString();
+            getYesterday.format();
         }
-        const from = encodeURIComponent(new Date(getYesterday).toISOString().slice(0, -5) + '+03:00');
-        const till = encodeURIComponent(today.toISOString().slice(0, -5) + '+03:00');
+        const from = encodeURIComponent(getYesterday.toISOString().slice(0, -5) + '+03:00');
+        const till = encodeURIComponent(moment_1.default().utcOffset(0).set({ hour: 23, minute: 59, second: 59, millisecond: 59 }).toISOString().slice(0, -5) + '+03:00');
         return { from, till };
     }
     getTodayTransactions(queryDate) {

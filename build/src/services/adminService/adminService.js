@@ -36,6 +36,25 @@ class AdminService {
             }
         });
     }
+    blockUser(req, res) {
+        try {
+            const { user } = req.body;
+            const dbManager = new database_1.DatabaseManager(config_1.default.db);
+            if (user.access === 'Owner') {
+                return res.status(400).json({ msg: 'Вы не можете удалить владельца.' });
+            }
+            user.cards.forEach((cardId) => {
+                dbManager.updateElement('public.cards', { ownerlogin: null, ownername: null }, 'id', cardId);
+            });
+            dbManager.deleteElement('*', 'public.transactions', 'userlogin', user.login);
+            dbManager.deleteElement('*', 'public.staff', 'login', user.login);
+            res.send({ msg: 'Пользователь успешно удален.' });
+        }
+        catch (err) {
+            console.log(err);
+            return res.status(400).json({ msg: err.response.data.msg });
+        }
+    }
 }
 exports.AdminService = AdminService;
 class AdminHelper {

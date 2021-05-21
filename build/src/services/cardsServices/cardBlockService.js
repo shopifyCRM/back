@@ -23,10 +23,10 @@ class CardBlockService {
                 const { cards } = req.body;
                 const renderCards = new renderAllCards_1.RenderAllCards();
                 yield this.blockCards(cards);
-                yield renderCards.renderAllCards();
                 if (!cards) {
                     return res.status(400).json({ msg: 'Выберите карту.' });
                 }
+                yield renderCards.renderAllCards();
                 if (cards.length === 1) {
                     return res.send(`Карта ${cards[0].cardnumber} была успешно заблокирована.`);
                 }

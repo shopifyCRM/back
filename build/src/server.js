@@ -15,6 +15,8 @@ app.use('/api', require('./routes/apiRouter'));
 app.use('/api', require('./routes/cardsRouter'));
 //Shopify Router
 app.use('/api/shopify', require('./routes/shopifyRouter'));
+//Transactions Router
+app.use('/api/transactions', require('./routes/transactionsRouter'));
 app.listen(config_1.default.server.port, () => {
     console.log(`Server is running on ${config_1.default.server.hostname}:${config_1.default.server.port}`);
 });

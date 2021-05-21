@@ -12,4 +12,5 @@ router.post('/login', authRoutes.login);
 router.post('/validToken', authRoutes.validToken);
 //Admin routes
 router.get('/getStaff', adminRoutes.getStaff.bind(adminRoutes));
+router.put('/blockUser', adminRoutes.blockUser.bind(adminRoutes));
 module.exports = router;
