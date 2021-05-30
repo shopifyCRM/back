@@ -17,6 +17,7 @@ const database_1 = require("../../../utils/database");
 const config_1 = __importDefault(require("../../config/config"));
 const moment_1 = __importDefault(require("moment"));
 const transactionsHelper_1 = require("./transactionsHelper");
+const uuid_1 = require("uuid");
 class TransactionsService {
     constructor() {
         this.transactionsHelper = new transactionsHelper_1.TransactionsHelper();
@@ -27,20 +28,7 @@ class TransactionsService {
                 const dbManager = new database_1.DatabaseManager(config_1.default.db);
                 let { users, timestamp } = req.body;
                 const dbRes = yield dbManager.findElement('*', 'public.transactions', 'timestamp', timestamp);
-                const result = [];
-                users.forEach((user) => {
-                    if (user.access !== 'Owner') {
-                        let sum = 0;
-                        const filtered = dbRes.filter((transaction) => transaction.userlogin === user.login);
-                        filtered[0].transactions.forEach((transaction) => {
-                            if (transaction.sum) {
-                                sum += transaction.sum;
-                            }
-                        });
-                        filtered[0].sum = sum;
-                        result.push(filtered[0]);
-                    }
-                });
+                const result = yield this.transactionsHelper.countUserTransactions(dbRes, users);
                 res.send({
                     timestamp,
                     result
@@ -49,6 +37,70 @@ class TransactionsService {
             catch (err) {
                 console.log(err);
                 return res.status(400).json({ msg: 'Произошла ошибка при попытке получения переводов.' });
+            }
+        });
+    }
+    getTransactionsBetweenTimestamps(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const dbManager = new database_1.DatabaseManager(config_1.default.db);
+                let { users, timestampfrom, timestamptill } = req.body;
+                const dbRes = yield dbManager.selectData('public.transactions', '*');
+                const filteredData = dbRes.filter((el) => el.timestamp >= timestampfrom && el.timestamp <= timestamptill);
+                let result = yield this.transactionsHelper.countUserTransactions(filteredData, users);
+                result = yield this.transactionsHelper.timestampSort(result);
+                const timestamp = timestampfrom + ' - ' + timestamptill;
+                res.send({
+                    timestamp,
+                    result
+                });
+            }
+            catch (err) {
+                console.log(err);
+                return res.status(400).json({ msg: 'Произошла ошибка при попытке получения переводов.' });
+            }
+        });
+    }
+    addTransaction(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const dbManager = new database_1.DatabaseManager(config_1.default.db);
+                let { timestamp, amount, comment, id } = req.body;
+                if (!amount) {
+                    return res.status(400).json({ msg: 'Введите сумму транзакции.' });
+                }
+                if (!comment) {
+                    return res.status(400).json({ msg: 'Введите комментарий к транзакции.' });
+                }
+                const foundTransaction = yield dbManager.findElement('*', 'public.transactions', 'id', id);
+                const foundEl = foundTransaction[0];
+                const transactionId = uuid_1.v4();
+                foundEl.transactions = [...foundEl.transactions, { timestamp, amount, comment, id: transactionId }];
+                dbManager.updateElement('public.transactions', foundEl, 'id', id);
+                return res.send('Транзакция была успешно добавлена.');
+            }
+            catch (err) {
+                console.log(err);
+                return res.status(400).json({ msg: 'Произошла ошибка при попытке добавления транзакции.' });
+            }
+        });
+    }
+    deleteTransaction(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const dbManager = new database_1.DatabaseManager(config_1.default.db);
+                let { id, transactionId } = req.body;
+                const foundTransactions = yield dbManager.findElement('*', 'public.transactions', 'id', id);
+                const foundEl = foundTransactions[0];
+                if (foundEl) {
+                    foundEl.transactions = foundEl.transactions.filter((el) => el.id !== transactionId);
+                }
+                yield dbManager.updateElement('public.transactions', foundEl, 'id', id);
+                return res.send('Транзакция была успешно уделена.');
+            }
+            catch (err) {
+                console.log(err);
+                return res.status(400).json({ msg: 'Произошла ошибка при попытке удалении транзакции.' });
             }
         });
     }
@@ -83,9 +135,12 @@ class TransactionsService {
                 try {
                     const dbManager = new database_1.DatabaseManager(config_1.default.db);
                     users.forEach((user) => {
-                        this.transactionsHelper.renderTransactions(allTransactions, currentDate, user, dbManager).then((transactions) => {
-                            return resolve(transactions);
-                        });
+                        if (user.cards) {
+                            this.transactionsHelper.renderTransactions(allTransactions, currentDate, user, dbManager).then((transactions) => {
+                                return resolve(transactions);
+                            });
+                        }
+                        return resolve(true);
                     });
                 }
                 catch (err) {
@@ -100,9 +155,12 @@ class TransactionsService {
             return new Promise((resolve, reject) => {
                 try {
                     const dbManager = new database_1.DatabaseManager(config_1.default.db);
-                    this.transactionsHelper.renderTransactions(allTransactions, currentDate, user, dbManager).then((transactions) => {
-                        return resolve(transactions);
-                    });
+                    if (user.cards) {
+                        this.transactionsHelper.renderTransactions(allTransactions, currentDate, user, dbManager).then((transactions) => {
+                            return resolve(transactions);
+                        });
+                    }
+                    return resolve(true);
                 }
                 catch (err) {
                     console.log(err);

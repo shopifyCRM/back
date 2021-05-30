@@ -5,4 +5,7 @@ const router = require('express').Router();
 const transactionsService = new transactionsService_1.TransactionsService();
 router.post('/renderTransactions', transactionsService.renderTransactions.bind(transactionsService));
 router.post('/getTransactions', transactionsService.getTransactions.bind(transactionsService));
+router.post('/getTransactionsBetweenTimestamps', transactionsService.getTransactionsBetweenTimestamps.bind(transactionsService));
+router.post('/addTransaction', transactionsService.addTransaction.bind(transactionsService));
+router.post('/deleteTransaction', transactionsService.deleteTransaction.bind(transactionsService));
 module.exports = router;

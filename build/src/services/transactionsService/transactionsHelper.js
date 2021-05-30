@@ -31,7 +31,7 @@ class TransactionsHelper {
                         ;
                         (() => __awaiter(this, void 0, void 0, function* () {
                             yield this.renderExistingCards(userCardsRes, elWithCurrentDate, dbManager);
-                            dbManager.selectData('public.transactions', '*').then((transactions) => {
+                            dbManager.findElement('*', 'public.transactions', 'timestamp', currentDate).then((transactions) => {
                                 return resolve(transactions);
                             });
                         }))();
@@ -59,15 +59,17 @@ class TransactionsHelper {
                         card['key'] = uuid_1.v4();
                         elWithCurrentDate.transactions = [...elWithCurrentDate.transactions, card];
                     }
-                    elWithCurrentDate.transactions.map((el) => {
-                        if (el.cardnumber === card.cardnumber) {
-                            if (el.sum !== card.sum) {
-                                console.log(true);
-                                el.sum = card.sum;
-                                return el;
+                    if (elWithCurrentDate.transactions) {
+                        elWithCurrentDate.transactions.map((el) => {
+                            if (el.cardnumber === card.cardnumber) {
+                                if (el.sum !== card.sum) {
+                                    console.log(true);
+                                    el.sum = card.sum;
+                                    return el;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                     dbManager.updateElement('public.transactions', elWithCurrentDate, 'id', elWithCurrentDate.id);
                     resolve(true);
                 });
@@ -106,6 +108,61 @@ class TransactionsHelper {
                 reject(err);
             }
         });
+    }
+    countUserTransactions(dbRes, users) {
+        return new Promise((resolve) => {
+            const result = [];
+            users.forEach((user) => {
+                if (user.access !== 'Owner') {
+                    const filtered = dbRes.filter((transaction) => transaction.userlogin == user.login);
+                    filtered.forEach((el) => {
+                        let sum = 0;
+                        const changedTransactions = {
+                            transactions: [],
+                            addedTransactions: []
+                        };
+                        el.transactions.forEach((transaction) => {
+                            if (transaction.cardnumber) {
+                                changedTransactions.transactions.push(transaction);
+                            }
+                            else {
+                                changedTransactions.addedTransactions.push(transaction);
+                            }
+                            if (transaction.sum || transaction.amount) {
+                                const addToSum = transaction.sum || transaction.amount;
+                                sum += addToSum;
+                            }
+                        });
+                        el.sum = sum;
+                        el.transactions = changedTransactions.transactions;
+                        el.addedTransactions = changedTransactions.addedTransactions;
+                        result.push(el);
+                    });
+                }
+            });
+            resolve(result);
+        });
+    }
+    timestampSort(arr) {
+        return new Promise((resolve) => {
+            let noSwap;
+            for (let i = arr.length; i > 0; i--) {
+                noSwap = true;
+                for (let j = 0; j < i - 1; j++) {
+                    if (arr[j].timestamp > arr[j + 1].timestamp) {
+                        this.swap(arr, j, j + 1);
+                        noSwap = false;
+                    }
+                }
+                if (noSwap)
+                    break;
+            }
+            return resolve(arr);
+        });
+    }
+    swap(arr, idx1, idx2) {
+        ;
+        [arr[idx1], arr[idx2]] = [arr[idx2], arr[idx1]];
     }
 }
 exports.TransactionsHelper = TransactionsHelper;

@@ -213,22 +213,24 @@ class QiwiServiceHelper {
                 const dbManager = new database_1.DatabaseManager(config_1.default.db);
                 const date = this.getDate(1, 'yesterday');
                 const dailyTransactions = yield this.getTodayTransactions(date);
-                for (let i = 0, max = user.cards.length; i < max; i++) {
-                    const rows = yield dbManager.findElement('*', 'public.cards', 'id', user.cards[i]);
-                    const cardData = rows[0];
-                    if (!cardData) {
-                        yield this.removeCardFromUser(user, user.cards[i]);
-                    }
-                    else {
-                        if (cardData.ownerlogin === user.login) {
-                            const transactions = this.countCardTransactionSum(cardData.cardnumber, dailyTransactions);
-                            if (transactions.cardnumber === cardData.cardnumber) {
-                                cardData.sum = transactions.sum;
-                            }
-                            cardsToRes.push(cardData);
+                if (Array.isArray(user.cards)) {
+                    for (let i = 0, max = user.cards.length; i < max; i++) {
+                        const rows = yield dbManager.findElement('*', 'public.cards', 'id', user.cards[i]);
+                        const cardData = rows[0];
+                        if (!cardData) {
+                            yield this.removeCardFromUser(user, user.cards[i]);
                         }
                         else {
-                            yield this.removeCardFromUser(user, cardData.id);
+                            if (cardData.ownerlogin === user.login) {
+                                const transactions = this.countCardTransactionSum(cardData.cardnumber, dailyTransactions);
+                                if (transactions.cardnumber === cardData.cardnumber) {
+                                    cardData.sum = transactions.sum;
+                                }
+                                cardsToRes.push(cardData);
+                            }
+                            else {
+                                yield this.removeCardFromUser(user, cardData.id);
+                            }
                         }
                     }
                 }
